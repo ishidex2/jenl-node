@@ -5,7 +5,7 @@ var fs = require('fs');
 
 var lexer = new Lexer();
 var ruleset = new LexerRuleset();
-var source = fs.readFileSync("test.hc").toString();
+var source = fs.readFileSync("test.jn").toString();
 
 function parse(tokens)
 {
@@ -58,9 +58,13 @@ function parse(tokens)
         bcode.push(["SET", tokens[i+3].label])
 
         loopExprs.push(expr.bc);
-        bcode.push(["REPEAT"])
 
+        bcode.push(["REPEAT"])
         scopes.push(bcode.length-1);
+        bcode.push(expr.bc.flat());
+        bcode.push(["QZL", scopes[scopes.length-1]]);
+
+
 
         bcode.push(["LODNUM", 1])
         bcode.push(["ADD", tokens[i+3].label])
@@ -74,8 +78,10 @@ function parse(tokens)
         loopExprs.push(expr.bc);
 
         bcode.push(["REPEAT"])
-
         scopes.push(bcode.length-1);
+        bcode.push(expr.bc.flat());
+        bcode.push(["QZL", scopes[scopes.length-1]]);
+
         i = i+2;
 
       }
@@ -161,7 +167,7 @@ function parseExpr(tokens, index)
   }
   if (rttokens[0].type == "DIGIT")
   {
-    byteCode.push(["LODNUM", rttokens[0].label])
+    byteCode.push(["LODNUM", parseInt(rttokens[0].label)])
   }
   return {bc: byteCode, index: index + 1};
 }
@@ -221,8 +227,7 @@ function evalBytecode(bcode)
     }
     if (bcode[i][0] == "LODNUM")
     {
-      loaded = parseInt(bcode[i][1]);
-
+      loaded = bcode[i][1];
     }
 
     if (bcode[i][0] == "JC")
@@ -239,6 +244,15 @@ function evalBytecode(bcode)
 
       }
       continue;
+      
+    }
+    if (bcode[i][0] == "QZL")
+    {
+      if (loaded <= 0)
+      {
+        counters.pop();
+        i = bcode.findIndex(e => e[0] == "JC")
+      }
       
     }
     if (bcode[i][0] == "DECLARE")
@@ -272,7 +286,7 @@ function evalBytecode(bcode)
 }
 
 ruleset.add(/\~[a-zA-Z]+/g, 'DIR');
-ruleset.add(/[1234567890]+/g, 'DIGIT');
+ruleset.add(/-?[1234567890]+/g, 'DIGIT');
 ruleset.add(/\/\/[^\n]+/g, 'NOTHING');
 ruleset.add(/\n/g, 'NOTHING');
 ruleset.add(/\s/g, 'NOTHING');
@@ -292,7 +306,7 @@ ruleset.add(/def/g, 'DECLARE');
 ruleset.add(/\+\=/g, 'ADD_TO');
 ruleset.add(/\=/g, 'ASSIGN');
 
-ruleset.add(/[a-zA-Z]+/g, 'IDENTIFIER');
+ruleset.add(/[a-z_A-Z]+[0-9]*/g, 'IDENTIFIER');
 
 var lexems = lexer.lex(ruleset, source);
 
